@@ -3,6 +3,11 @@
 一个**不预置任何提示词**的纯净版 Android 聊天客户端。原生外壳 + WebView 界面，直连模型 API，无中间服务器、无账号体系、无遥测。
 
 <p align="center">
+  <a href="https://github.com/md5sy9rg5b/purechat/releases/latest"><img src="https://img.shields.io/github/v/release/md5sy9rg5b/purechat?label=%E4%B8%8B%E8%BD%BD%20APK" alt="下载 APK" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/chat.png" width="260" alt="对话界面" />
   <img src="docs/screenshots/web-search.png" width="260" alt="联网搜索" />
   <img src="docs/screenshots/settings.png" width="260" alt="设置" />
@@ -85,7 +90,18 @@ pwsh -File build.ps1 -SelfTestOnly   # 只跑纯 JVM 自测（842 项）
 pwsh -File build-debug.ps1           # 可调试包（开启 WebView 远程调试）
 ```
 
-### 安装
+### 直接安装（免构建）
+
+从 [Releases](https://github.com/md5sy9rg5b/purechat/releases/latest) 下载 `PureChat.apk`，
+传到手机上安装即可。首次安装需允许「安装未知来源应用」。
+
+```bash
+adb install -r PureChat.apk
+```
+
+要求 Android 8.0（API 26）及以上。
+
+### 自己构建后安装
 
 ```bash
 adb push PureChat.apk /data/local/tmp/purechat.apk
