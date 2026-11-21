@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PureChat</string>
+    <string name="chat_placeholder">发消息…</string>
+    <string name="new_chat">新对话</string>
+</resources>

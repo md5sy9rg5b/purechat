@@ -1,0 +1,1 @@
+{"name":"purechat-web","private":true,"version":"0.1.0","type":"module","dependencies":{"esbuild":"^0.25.0","katex":"^0.16.22"}}

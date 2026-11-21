@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no" />
+    <meta name="color-scheme" content="light dark" />
+    <title>PureChat</title>
+    <link rel="stylesheet" href="katex.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div id="app">
+      <header id="topbar">
+        <button id="btn-drawer" class="icon-btn" type="button" aria-label="会话列表">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div id="title" class="title">新对话</div>
+        <button id="btn-new" class="icon-btn" type="button" aria-label="新建对话">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+
+      <main id="scroller">
+        <div id="messages"></div>
+        <div id="welcome" class="welcome" hidden>
+          <div class="welcome-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48"><path d="M10 12.5A4.5 4.5 0 0 1 14.5 8h19A4.5 4.5 0 0 1 38 12.5v15a4.5 4.5 0 0 1-4.5 4.5H22l-8.4 6.3A1.5 1.5 0 0 1 11 37.1V32h-.5A.5.5 0 0 1 10 31.5z"/></svg>
+          </div>
+          <div class="welcome-title">有什么可以帮忙的？</div>
+        </div>
+      </main>
+
+      <div id="scroll-bottom" class="scroll-bottom" hidden aria-label="回到底部">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </div>
+
+      <footer id="composer">
+        <div id="edit-bar" class="edit-bar" hidden>
+          <span id="edit-bar-text" class="edit-bar-text">正在编辑这条消息</span>
+          <button id="btn-cancel-edit" class="edit-bar-cancel" type="button">取消</button>
+        </div>
+        <div id="attach-row" class="attach-row" hidden></div>
+        <div id="composer-inner">
+          <button id="btn-attach" class="icon-btn attach-btn" type="button" aria-label="添加附件">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <textarea id="input" rows="1" enterkeyhint="send" placeholder="发消息…"></textarea>
+          <button id="btn-mic" class="icon-btn mic-btn" type="button" aria-label="语音输入">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          </button>
+          <button id="btn-send" class="send-btn" type="button" aria-label="发送" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+          </button>
+          <button id="btn-stop" class="send-btn stop" type="button" aria-label="停止生成" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="8" height="8" rx="1.6"/></svg>
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <div id="scrim" hidden></div>
+
+    <aside id="drawer" aria-label="会话列表">
+      <div class="drawer-top">
+        <div class="drawer-brand">PureChat</div>
+        <button id="btn-drawer-close" class="icon-btn" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <button id="btn-new-chat" class="new-chat" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span>新建对话</span>
+      </button>
+      <div id="sessions" class="sessions"></div>
+      <div class="drawer-foot">
+        <button id="btn-settings" class="foot-btn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4 15H3.8a2 2 0 1 1 0-4H4a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 11 4V3.8a2 2 0 1 1 4 0V4a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 20 11h.2a2 2 0 1 1 0 4H20z"/></svg>
+          <span>设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <section id="settings" aria-label="设置">
+      <div class="sheet-head">
+        <div class="sheet-title">设置</div>
+        <button id="btn-settings-close" class="icon-btn" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div class="field">
+          <span class="field-label">API Key</span>
+          <div class="key-row">
+            <input id="inp-key" class="field-input key-input" type="text" autocomplete="off"
+              autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="sk-…" />
+            <button id="btn-paste-key" class="key-btn" type="button" aria-label="从剪贴板粘贴">粘贴</button>
+            <button id="btn-toggle-key" class="key-btn" type="button" aria-label="显示或隐藏">显示</button>
+          </div>
+        </div>
+        <label class="field">
+          <span class="field-label">接口地址</span>
+          <input id="inp-base" class="field-input" type="url" autocomplete="off" spellcheck="false" placeholder="https://api.deepseek.com" />
+        </label>
+        <label class="field">
+          <span class="field-label">模型</span>
+          <input id="inp-model" class="field-input" type="text" autocomplete="off" spellcheck="false" placeholder="deepseek-flash" />
+        </label>
+        <label class="row">
+          <span class="row-label">深度思考</span>
+          <input id="inp-thinking" class="switch" type="checkbox" />
+        </label>
+        <label class="field" id="field-effort">
+          <span class="field-label">思考强度<small class="field-hint">越高越慢，但推理更充分</small></span>
+          <select id="inp-effort" class="field-select">
+            <option value="default">默认（由服务端决定）</option>
+            <option value="minimal">极低 minimal</option>
+            <option value="low">低 low</option>
+            <option value="medium">中 medium</option>
+            <option value="high">高 high</option>
+            <option value="xhigh">较高 xhigh</option>
+            <option value="ultra">超高 ultra</option>
+            <option value="max">最高 max</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">输出上限<small class="field-hint">单次回复的最大 token 数</small></span>
+          <input id="inp-maxtokens" class="field-input" type="number" inputmode="numeric" min="256" max="393216" step="256" placeholder="8192" />
+        </label>
+        <label class="row">
+          <span class="row-label">联网搜索<small class="field-hint">开启思考时为深度思考搜索</small></span>
+          <input id="inp-search" class="switch" type="checkbox" />
+        </label>
+        <label class="row">
+          <span class="row-label">阅读链接<small class="field-hint">自动识别消息中的网址</small></span>
+          <input id="inp-readurl" class="switch" type="checkbox" />
+        </label>
+        <label class="row">
+          <span class="row-label">自动生成会话标题</span>
+          <input id="inp-title" class="switch" type="checkbox" />
+        </label>
+        <label class="row">
+          <span class="row-label">内容安全审核</span>
+          <input id="inp-safety" class="switch" type="checkbox" />
+        </label>
+        <label class="field">
+          <span class="field-label">朗读音色</span>
+          <select id="inp-voice" class="field-select">
+            <option value="stella">海星（女声）</option>
+            <option value="tide">暗潮（男声）</option>
+          </select>
+        </label>
+        <label class="row">
+          <span class="row-label">发送时间地点信息<small class="field-hint">让回答结合当前日期与地区</small></span>
+          <input id="inp-reminder" class="switch" type="checkbox" />
+        </label>
+        <label class="field" id="field-location">
+          <span class="field-label">所在地</span>
+          <input id="inp-location" class="field-input" type="text" autocomplete="off" placeholder="例如 上海（留空则不包含地点）" />
+        </label>
+        <label class="field">
+          <span class="field-label">系统提示词（可留空）</span>
+          <textarea id="inp-system" class="field-input field-textarea" rows="3" spellcheck="false" placeholder="留空则完全纯净，不向模型发送任何预设提示"></textarea>
+        </label>
+        <label class="row">
+          <span class="row-label">外观</span>
+          <select id="inp-theme" class="field-select">
+            <option value="system">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </label>
+        <button id="btn-verify" class="wide-btn" type="button">校验连接</button>
+        <button id="btn-save-settings" class="wide-btn primary" type="button">保存</button>
+        <button id="btn-clear" class="wide-btn danger" type="button">清空全部对话</button>
+        <div class="sheet-note">对话记录仅保存在本机，API Key 保存在应用私有目录。</div>
+      </div>
+    </section>
+
+    <div id="toast" hidden></div>
+    <div id="confirm" hidden>
+      <div class="confirm-card">
+        <div id="confirm-text" class="confirm-text"></div>
+        <div class="confirm-actions">
+          <button id="confirm-cancel" class="wide-btn" type="button">取消</button>
+          <button id="confirm-ok" class="wide-btn danger" type="button">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="katex.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+# 构建产物
+/build/
+/out/
+*.apk
+*.idsig
+
+# 签名材料：绝不入库
+/keystore/
+*.jks
+*.keystore
+
+# 依赖
+web/node_modules/
+
+# 本地调试脚手架（真机调试用，含设备路径）
+/tools/
+
+# 系统与编辑器
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# 临时文件
+*.log
+*.tmp

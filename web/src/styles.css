@@ -1,0 +1,2460 @@
+/* ============================================================================
+   PureChat · Android WebView 聊天界面样式（单文件 / 纯 CSS / 无构建）
+   ----------------------------------------------------------------------------
+   主题变量组织（三层，组件只依赖第二、三层，改主题时只动配色层）：
+
+   1) 尺寸与动效常量 —— 定义在 :root，与主题无关：
+      --tap 触摸目标、--radius-* 圆角档位、--fs-* 与 --lh-* 字号行高、--dur-* 与 --ease 动效节奏。
+   2) 浅色语义色板 —— body, body[data-theme="light"]：
+      bg 页面底 / panel 侧栏 / surface 控件底 / surface-2 按压 / bg-elevated 浮层
+      border / border-hair / border-strong（三级描边）
+      text-primary / secondary / tertiary / placeholder / inverse（五级文字）
+      accent（品牌蓝）/ accent-hover / accent-press / accent-text / accent-weak / accent-ring
+      danger / danger-text / danger-weak / danger-border（危险操作与错误）
+      bubble-user（用户气泡）/ code-bg / code-bar / code-border / inline-code / quote-bar
+      switch-track / scrim / toast-bg / toast-text / shadow-*
+   3) 深色语义色板 —— body[data-theme="dark"]：同名令牌整套覆盖。
+      深色不使用纯黑纯白：#151517 底、#E9EBEF 主文字，层级靠 surface 逐级提亮 + 低透明描边。
+
+   约定：
+   - 全部颜色只出现在第 2/3 层，组件区块内不写死色值。
+   - 不接受任何网络资源（图片 / 字体 / @import）；图标全部是内联 <svg>，用 currentColor 着色。
+   - 页面整体不滚动（html/body overflow:hidden），仅 #scroller / .sessions / .sheet-body 内部滚动。
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   1. 基础常量
+   ---------------------------------------------------------------------------- */
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans SC",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono",
+    "Noto Sans Mono", "Cascadia Mono", "DejaVu Sans Mono", monospace;
+
+  /* 触摸目标：任何可点击元素的实际命中区 ≥ 44px */
+  --tap: 44px;
+
+  /* 圆角档位：8 小控件 / 12 卡片 / 16 气泡 / 22 药丸 */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 999px;
+
+  /* 字号 / 行高 */
+  --fs-body: 16px;
+  --lh-body: 28px;
+  --fs-small: 14px;
+  --lh-small: 22px;
+  --fs-meta: 12px;
+  --lh-meta: 18px;
+  --fs-code: 13px;
+  --lh-code: 22px;
+
+  /* 动效：只做 transform / opacity */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 0.18s;
+  --dur: 0.22s;
+  --dur-drawer: 0.25s;
+
+  /* 安全区：Android WebView 的 env() 安全区查询不可靠，
+     统一由原生侧注入 --safe-top / --safe-bottom（单位 px），这里只给 0 兜底。
+     所有贴边容器都用 calc(var(--safe-*) + 基础值)，不写死状态栏/导航栏高度。 */
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+}
+
+/* ----------------------------------------------------------------------------
+   2. 浅色主题（默认）
+   ---------------------------------------------------------------------------- */
+body,
+body[data-theme="light"] {
+  color-scheme: light;
+
+  /* 底层与容器 */
+  --bg: #ffffff;
+  --panel: #f9fafb;
+  --surface: #f4f6f8;
+  --surface-2: #eceef2;
+  --bg-elevated: #ffffff;
+
+  /* 描边 */
+  --border-hair: rgba(16, 19, 26, 0.06);
+  --border: rgba(16, 19, 26, 0.1);
+  --border-strong: rgba(16, 19, 26, 0.18);
+
+  /* 文字层级 */
+  --text-primary: #0f1115;
+  --text-secondary: #5a6069;
+  --text-tertiary: #71767d;
+  --text-placeholder: #868c94;
+  --text-inverse: #ffffff;
+
+  /* 品牌蓝 */
+  --accent: #3964fe;
+  --accent-hover: #2e56ee;
+  --accent-press: #2a4cd6;
+  --accent-text: #2f58e8;
+  --accent-weak: #edf3fe;
+  --accent-ring: rgba(57, 100, 254, 0.18);
+
+  /* 危险 / 状态 */
+  --danger: #d92d20;
+  --danger-text: #c4291d;
+  --danger-weak: #fef3f2;
+  --danger-border: rgba(217, 45, 32, 0.22);
+  --success: #17864a;
+  --warning: #b76a00;
+
+  /* 消息与排版块 */
+  --bubble-user: #edf3fe;
+  --code-bg: #f7f8fa;
+  --code-bar: #eff1f4;
+  --code-border: rgba(16, 19, 26, 0.08);
+  --inline-code: #f1f3f5;
+  --quote-bar: #c8cfda;
+
+  /* 控件与浮层 */
+  --switch-track: #dde1e6;
+  --switch-knob: #ffffff;
+  --scrim: rgba(15, 17, 21, 0.34);
+  --confirm-scrim: rgba(15, 17, 21, 0.42);
+  --toast-bg: #2c3037;
+  --toast-text: #f5f6f8;
+  --shadow-card: 0 1px 3px rgba(16, 19, 26, 0.05);
+  --shadow-pop: 0 12px 32px rgba(16, 19, 26, 0.14), 0 2px 8px rgba(16, 19, 26, 0.06);
+}
+
+/* ----------------------------------------------------------------------------
+   3. 深色主题
+   ---------------------------------------------------------------------------- */
+body[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #151517;
+  --panel: #1a1a1c;
+  --surface: #212123;
+  --surface-2: #2a2a2d;
+  --bg-elevated: #1e1e20;
+
+  --border-hair: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  --text-primary: #e9ebef;
+  --text-secondary: #a9aeb6;
+  --text-tertiary: #8a8f97;
+  --text-placeholder: #7f858d;
+  --text-inverse: #101216;
+
+  --accent: #3d6bf0;
+  --accent-hover: #4a79ff;
+  --accent-press: #345cd6;
+  --accent-text: #8ab0ff;
+  --accent-weak: #1d2534;
+  --accent-ring: rgba(97, 140, 255, 0.24);
+
+  --danger: #d93b30;
+  --danger-text: #f4776b;
+  --danger-weak: #2a1d1c;
+  --danger-border: rgba(244, 119, 107, 0.24);
+  --success: #3fbf7f;
+  --warning: #e0a03a;
+
+  --bubble-user: #2c2c2e;
+  --code-bg: #1b1b1d;
+  --code-bar: #232326;
+  --code-border: rgba(255, 255, 255, 0.07);
+  --inline-code: #2a2a2d;
+  --quote-bar: #3a3f49;
+
+  --switch-track: #3a3d42;
+  --switch-knob: #f0f2f5;
+  --scrim: rgba(0, 0, 0, 0.56);
+  --confirm-scrim: rgba(0, 0, 0, 0.62);
+  --toast-bg: #2e3138;
+  --toast-text: #f0f2f5;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ----------------------------------------------------------------------------
+   4. 复位与页面骨架
+   ---------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 统一处理所有 JS 用 hidden 属性控制的节点 */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+  font-variant-ligatures: no-contextual;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+body {
+  /* 键盘弹出时 adjustResize 会缩短视口，#app 始终撑满 */
+  touch-action: manipulation;
+}
+
+svg {
+  display: block;
+  flex: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 文本必须可选中（复制回答） */
+p,
+li,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+td,
+th,
+.md-p,
+.md-li,
+.msg-body,
+.msg-time,
+.thinking-body {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ----------------------------------------------------------------------------
+   5. 应用外壳
+   ---------------------------------------------------------------------------- */
+#app {
+  /* 用 grid 而不是 flex：#scroll-bottom 与 #scroller 叠在同一格，
+     这样悬浮按钮天然贴在输入区上方，且不占任何布局高度（输入区多行变高也不会重叠）。 */
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: 100%;
+  /* 减去键盘高度：窗口是全屏绘制（decorFitsSystemWindows=false），
+     系统不会替我们缩小可视区，必须自己让出输入法占用的部分，
+     否则软键盘会盖住输入框。--keyboard-height 由原生按 IME insets 注入。 */
+  height: calc(100% - var(--keyboard-height, 0px));
+  overflow: hidden;
+  background-color: var(--bg);
+  transition: height 0.18s var(--ease, ease);
+}
+
+/* ---- 顶栏 ---- */
+#topbar {
+  position: relative;
+  z-index: 10;
+  grid-row: 1;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* 安全区上方留出 --safe-top 后，剩余 56px 为可见栏高。
+     用 padding-top 让出安全区、padding-bottom:0 会把 56px 全部落在内容盒里，
+     align-items:center 才能让标题在「可见栏」内真正垂直居中。 */
+  /* content-box：56px 是可见栏高本身，padding-top 再把安全区垫在上方，
+     因此按钮与标题在可见的 56px 内居中，而不是在「56px+安全区」里居中。 */
+  box-sizing: content-box;
+  height: 56px;
+  padding: var(--safe-top) 6px 0;
+  background-color: var(--bg);
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.icon-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.icon-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-btn:active {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+
+@media (hover: hover) {
+  .icon-btn:hover {
+    background-color: var(--surface);
+    color: var(--text-primary);
+  }
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  letter-spacing: -0.01em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+/* ---- 滚动区 ---- */
+#scroller {
+  position: relative;
+  grid-row: 2;
+  grid-column: 1;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+#scroller::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+#messages {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 16px 20px;
+}
+
+/* ---- 欢迎页 ---- */
+.welcome,
+#welcome {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px 32px 15vh;
+  text-align: center;
+}
+
+.welcome[hidden] {
+  display: none !important;
+}
+
+.welcome-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  color: var(--accent);
+  background-color: var(--accent-weak);
+}
+
+.welcome-mark svg {
+  width: 34px;
+  height: 34px;
+}
+
+.welcome-mark svg path {
+  fill: currentColor;
+  stroke: none;
+}
+
+.welcome-title {
+  max-width: 20em;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 30px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* ---- 回到底部 ---- */
+.scroll-bottom,
+#scroll-bottom {
+  grid-row: 2;
+  grid-column: 1;
+  align-self: end;
+  justify-self: end;
+  z-index: 30;
+  margin: 0 16px 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(16, 19, 26, 0.1);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+  pointer-events: none;
+}
+
+.scroll-bottom:not([hidden]),
+#scroll-bottom:not([hidden]) {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.scroll-bottom svg,
+#scroll-bottom svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body[data-theme="dark"] #scroll-bottom,
+body[data-theme="dark"] .scroll-bottom {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* ----------------------------------------------------------------------------
+   6. 消息
+   ---------------------------------------------------------------------------- */
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.msg.user {
+  align-items: flex-end;
+  /* 用户气泡与紧随其后的助手正文之间略多留一点呼吸（18px 基线 + 6px） */
+  margin-bottom: 6px;
+}
+
+.msg.assistant {
+  align-items: stretch;
+}
+
+.msg-body {
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 用户气泡：右对齐、主色浅底、16 圆角 + 右上 4 */
+/* 用户气泡：外层只负责右对齐与宽度上限，内层才是真正的气泡。
+   两者都写 width:fit-content 会导致宽度被算两次，短句被压窄后提前折行。 */
+.msg.user .msg-body {
+  width: auto;
+  max-width: 86%;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+.msg.user .msg-body .user-text {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: var(--radius-lg) 4px var(--radius-lg) var(--radius-lg);
+  background-color: var(--bubble-user);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 助手：无气泡，纯文本流，占满宽度 */
+.msg.assistant .msg-body {
+  width: 100%;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+/* 操作行：默认隐藏，hover / .show-tools 显示；触摸端常显但低对比 */
+.msg-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 隐藏时不占高度：否则不可见的操作行仍会撑出 44px 空白 */
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.msg.user .msg-tools {
+  justify-content: flex-end;
+}
+
+.msg:hover .msg-tools,
+.msg.show-tools .msg-tools,
+.msg:focus-within .msg-tools {
+  height: auto;
+  opacity: 1;
+}
+
+.msg-tools button,
+.msg-tools .tool-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: var(--tap);
+  height: var(--tap);
+  padding: 0 10px;
+  border-radius: var(--radius-xs);
+  color: var(--text-tertiary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.msg-tools button:active,
+.msg-tools .tool-btn:active {
+  background-color: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.msg-tools svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 触摸端：不依赖 hover，操作行常显但压低对比 */
+@media (hover: none) {
+  .msg-tools {
+    height: auto;
+    opacity: 1;
+  }
+
+  .msg-tools button,
+  .msg-tools .tool-btn {
+    color: var(--text-placeholder);
+  }
+}
+
+.msg-time {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--text-tertiary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.msg.user .msg-time {
+  padding-right: 2px;
+  text-align: right;
+}
+
+/* 流式光标 */
+.typing-caret {
+  display: inline-block;
+  width: 7px;
+  height: 17px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background-color: var(--accent);
+  animation: caret-blink 1.05s steps(1, end) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+/* ---- 思考过程 ---- */
+.thinking-box {
+  margin: 0 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+}
+
+.thinking-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  padding: 0 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.thinking-head:active {
+  background-color: var(--surface-2);
+}
+
+.thinking-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 标题条是折叠区的唯一入口，用主文字色保证深浅两套主题下都清晰 */
+  color: var(--text-primary);
+}
+
+/* app.js 注入的「展开 / 收起」文字 */
+.thinking-toggle {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  /* 操作文案用次级色（深色下约 7:1），不再用三级灰 */
+  color: var(--text-secondary);
+}
+
+/* 折叠箭头（纯 CSS，避免依赖 JS 注入 svg） */
+.thinking-head::after {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  margin-left: 8px;
+  border-right: 1.8px solid var(--text-secondary);
+  border-bottom: 1.8px solid var(--text-secondary);
+  transform: rotate(45deg);
+  transition: transform var(--dur-fast) var(--ease), margin-top var(--dur-fast) var(--ease);
+}
+
+.thinking-box.open .thinking-head::after {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.thinking-head svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.thinking-body {
+  display: none;
+  padding: 10px 14px 12px;
+  white-space: pre-wrap;
+  border-top: 1px solid var(--border-hair);
+  font-size: var(--fs-small);
+  line-height: 24px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.thinking-box.open .thinking-body {
+  display: block;
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+
+/* 思考区内的 Markdown 收敛一号 */
+.thinking-body .md-p,
+.thinking-body .md-ul,
+.thinking-body .md-ol,
+.thinking-body .md-quote,
+.thinking-body .md-pre,
+.thinking-body .md-table-wrap {
+  margin-bottom: 8px;
+}
+
+.thinking-body .md-p {
+  font-size: var(--fs-small);
+  line-height: 24px;
+}
+
+.thinking-body .md-li {
+  font-size: var(--fs-small);
+  line-height: 24px;
+}
+
+.thinking-body .md-h1,
+.thinking-body .md-h2,
+.thinking-body .md-h3,
+.thinking-body .md-h4,
+.thinking-body .md-h5,
+.thinking-body .md-h6 {
+  margin: 10px 0 6px;
+  font-size: var(--fs-small);
+  line-height: 24px;
+}
+
+/* ---- 错误卡片 ---- */
+.error-box {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background-color: var(--danger-weak);
+  color: var(--danger-text);
+  font-size: 13px;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.error-box:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- 空态提示 ---- */
+.empty-hint {
+  padding: 24px 16px;
+  font-size: 13px;
+  line-height: 21px;
+  text-align: center;
+  color: var(--text-tertiary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ----------------------------------------------------------------------------
+   7. Markdown 排版
+   ---------------------------------------------------------------------------- */
+.md-p {
+  margin: 0 0 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.md-h1,
+.md-h2,
+.md-h3,
+.md-h4,
+.md-h5,
+.md-h6 {
+  margin: 20px 0 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.md-h1 {
+  font-size: 22px;
+  line-height: 32px;
+}
+
+.md-h2 {
+  font-size: 20px;
+  line-height: 30px;
+}
+
+.md-h3 {
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.md-h4 {
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.md-h5,
+.md-h6 {
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--text-secondary);
+}
+
+.md-ul,
+.md-ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.md-ul {
+  list-style: disc outside;
+}
+
+.md-ol {
+  list-style: decimal outside;
+}
+
+.md-li {
+  margin: 0;
+  padding-left: 1px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.md-li + .md-li {
+  margin-top: 2px;
+}
+
+.md-li::marker {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 嵌套列表收紧 */
+.md-ul .md-ul,
+.md-ul .md-ol,
+.md-ol .md-ul,
+.md-ol .md-ol {
+  margin: 2px 0;
+  padding-left: 20px;
+}
+
+.md-quote {
+  margin: 0 0 12px;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--quote-bar);
+  border-radius: 1px;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+
+.md-quote > *:last-child {
+  margin-bottom: 0;
+}
+
+.md-hr {
+  height: 1px;
+  margin: 20px 0;
+  border: 0;
+  background-color: var(--border);
+}
+
+.md-strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.md-em {
+  font-style: italic;
+}
+
+.md-del {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.md-link {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ---- 公式（MdBridge 输出 .md-math 占位，app.js 用 KaTeX 排版）---- */
+.md-math {
+  font-size: 1em;
+  /* 公式颜色跟随正文，不读取 KaTeX 自带主题色 */
+  color: var(--text-primary);
+}
+
+/* 行内公式：与中文正文基线对齐，长公式不撑破气泡 */
+.md-math[data-display="0"] {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: -0.12em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.md-math[data-display="0"]::-webkit-scrollbar {
+  height: 0;
+}
+
+/* 块级公式：独占一行、居中、可横向滚动 */
+.md-math[data-display="1"] {
+  display: block;
+  max-width: 100%;
+  /* 块级公式：上下留白与段落节奏一致，居中，超宽时自身横向滚动 */
+  margin: 10px 0 14px;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  -webkit-overflow-scrolling: touch;
+}
+
+.md-math[data-display="1"]::-webkit-scrollbar {
+  height: 3px;
+}
+
+.md-math[data-display="1"]::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background-color: var(--border-strong);
+}
+
+/* 块级公式在段落末尾时不再叠加额外下边距，交给 .md-p 自己的节奏 */
+.md-p > .md-math[data-display="1"]:last-child {
+  margin-bottom: 0;
+}
+
+/* KaTeX 自身的尺寸框不参与溢出计算，交给外层滚动 */
+.md-math .katex {
+  font-size: 1.05em;
+  color: inherit;
+}
+
+.md-math .katex-display {
+  margin: 0;
+  padding: 0;
+}
+
+/* 公式内部文字不参与整段复制干扰，但允许框选 */
+.md-math .katex-html {
+  white-space: nowrap;
+}
+
+.md-link:active {
+  opacity: 0.7;
+}
+
+/* ---- 行内代码 ---- */
+.md-inline-code {
+  display: inline;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background-color: var(--inline-code);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: inherit;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ---- 代码块：外层负责圆角与横向滚动，语言条固定在顶部 ---- */
+.md-pre {
+  position: relative;
+  max-width: 100%;
+  margin: 0 0 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-md);
+  background-color: var(--code-bg);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.md-pre > pre,
+.md-pre pre {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: none;
+  font: inherit;
+}
+
+.md-pre::-webkit-scrollbar,
+.md-table-wrap::-webkit-scrollbar {
+  height: 3px;
+}
+
+.md-pre::-webkit-scrollbar-thumb,
+.md-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background-color: var(--border-strong);
+}
+
+.md-pre::-webkit-scrollbar-track,
+.md-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.md-code-lang {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--code-border);
+  background-color: var(--code-bar);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.md-code {
+  display: block;
+  min-width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
+  line-height: var(--lh-code);
+  color: var(--text-primary);
+  white-space: pre;
+  tab-size: 2;
+  -webkit-text-size-adjust: none;
+}
+
+/* ---- 表格 ----
+   Java 侧是「每一行表格各输出一个 .md-table-wrap」，也就是
+   <div class="md-table-wrap"><table><tbody><tr>…</tr></tbody></table></div> 逐行平铺。
+   因此这里不做「整块圆角卡片」（逐行描边会在接缝处叠出双线），
+   而是走数据表的做法：每行一条细横线 + 固定列宽，多行天然拼成一张连续的表。 */
+.md-table-wrap {
+  max-width: 100%;
+  /* 每行 wrap 自带一条下细线：一行一条线，多行拼起来就是连续表格，
+     且不会出现「描边+单元格边框」叠成双线的问题。 */
+  margin: 0 0 14px;
+  border-bottom: 1px solid var(--border-hair);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* 表格容器只有 3px 细滚动条，不遮挡单元格文字 */
+.md-table-wrap::-webkit-scrollbar {
+  height: 3px;
+}
+
+/* 相邻行之间抹掉段落间距，视觉上连成一张表；行与行不会叠出双线 */
+.md-table-wrap + .md-table-wrap {
+  margin-top: -14px;
+}
+
+/* Java 侧每行都是独立的 <table>，为了让不同行的列宽一致，用 auto 布局 +
+   首列最小宽度：窄屏时表格整体横向滚动，首列不会被压成一条缝。 */
+.md-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--text-primary);
+}
+
+.md-table th {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface);
+  font-weight: 600;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.md-table td {
+  padding: 9px 12px;
+  vertical-align: top;
+  /* 首列是行标题，给它一个下限，避免窄屏被挤塌 */
+  min-width: 88px;
+  max-width: 60vw;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.md-table td:first-child {
+  min-width: 96px;
+  font-weight: 500;
+}
+
+.md-table td:not(:first-child) {
+  white-space: nowrap;
+}
+
+/* app.js 的结构是 .msg-body > .answer > .md-*，.answer 只作为包裹层 */
+.answer {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* 段落级首尾留白收敛：任何块的首子块不加上边距、尾子块不留下边距 */
+.msg-body > *:first-child,
+.answer > *:first-child,
+.thinking-body > *:first-child,
+.md-quote > *:first-child {
+  margin-top: 0 !important;
+}
+
+.msg-body > *:last-child,
+.answer > *:last-child,
+.thinking-body > *:last-child,
+.md-quote > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* 流式光标紧跟在最后一段文字后面，而不是掉到下一行 */
+.answer:has(> .typing-caret) > .md-p:last-of-type,
+.answer:has(> .typing-caret) > .md-li:last-of-type {
+  display: inline;
+}
+
+/* ----------------------------------------------------------------------------
+   8. 输入区
+   ---------------------------------------------------------------------------- */
+#composer {
+  position: relative;
+  z-index: 20;
+  grid-row: 3;
+  grid-column: 1;
+  /* 键盘弹出时导航栏已被遮挡，此时不再叠加底部安全区，避免多出一段空白。 */
+  padding: 8px 12px calc(8px + var(--safe-bottom) * (1 - var(--keyboard-open, 0)));
+  background-color: var(--bg);
+  border-top: 1px solid var(--border-hair);
+}
+
+#composer-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 52px;
+  padding: 4px 4px 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background-color: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+#composer-inner:focus-within {
+  border-color: var(--border-strong);
+  background-color: var(--bg);
+}
+
+#input {
+  display: block;
+  /* 不用 width:100%：它和 flex-basis:auto 组合会按内容宽度参与分配，
+     与两侧按钮同处一行时会把输入框压窄，导致文字提前折行。 */
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 40vh;
+  margin: 0;
+  padding: 10px 0;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--text-primary);
+  caret-color: var(--accent);
+  overscroll-behavior: contain;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#input::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
+}
+
+.send-btn,
+#btn-send {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border-radius: var(--radius-full);
+  color: var(--text-inverse);
+  background-color: var(--accent);
+  transition: background-color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease),
+    transform 0.12s var(--ease);
+}
+
+.send-btn svg,
+#btn-send svg,
+#btn-stop svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.send-btn:active {
+  transform: scale(0.94);
+  background-color: var(--accent-press);
+}
+
+.send-btn:disabled,
+#btn-send:disabled {
+  color: var(--text-placeholder);
+  background-color: var(--surface-2);
+  transform: none;
+}
+
+/* 停止态：中性色，避免和发送抢注意力 */
+.send-btn.stop,
+#btn-stop {
+  color: var(--text-primary);
+  background-color: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.send-btn.stop:active {
+  background-color: var(--surface);
+}
+
+/* ----------------------------------------------------------------------------
+   9. 抽屉（会话列表）
+   ---------------------------------------------------------------------------- */
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: var(--scrim);
+  /* app.js 的流程是：hidden=false → 下一帧加 .show 淡入；关闭时先移除 .show 再置 hidden。
+     因此默认透明，只由 .show 控制不透明度，开合两个方向都有过渡。 */
+  opacity: 0;
+  transition: opacity var(--dur-drawer) var(--ease);
+}
+
+#scrim.show {
+  opacity: 1;
+}
+
+#drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(84vw, 320px);
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  background-color: var(--panel);
+  border-right: 1px solid var(--border-hair);
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition: transform var(--dur-drawer) var(--ease), visibility var(--dur-drawer);
+  will-change: transform;
+}
+
+#drawer.open {
+  visibility: visible;
+  transform: none;
+  transition: transform var(--dur-drawer) var(--ease);
+}
+
+.drawer-top {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 8px 6px 20px;
+}
+
+.drawer-brand {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.new-chat {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 46px;
+  margin: 4px 12px 10px;
+  border-radius: 14px;
+  color: #ffffff;
+  background-color: var(--accent);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: 0.01em;
+  transition: background-color var(--dur-fast) var(--ease), transform 0.12s var(--ease);
+}
+
+.new-chat svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.new-chat:active {
+  background-color: var(--accent-press);
+  transform: scale(0.99);
+}
+
+.sessions,
+#sessions {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 2px 8px 8px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.sessions::-webkit-scrollbar,
+#sessions::-webkit-scrollbar {
+  width: 0;
+}
+
+.session-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-height: 56px;
+  padding: 9px 52px 9px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.session-item + .session-item {
+  margin-top: 2px;
+}
+
+.session-item:active {
+  background-color: var(--surface-2);
+}
+
+@media (hover: hover) {
+  .session-item:hover {
+    background-color: var(--surface);
+  }
+}
+
+.session-item.active {
+  background-color: var(--accent-weak);
+}
+
+.session-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.session-item.active .session-title {
+  font-weight: 500;
+  color: var(--accent-text);
+}
+
+.session-meta {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-meta);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.session-del {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin-top: calc(var(--tap) / -2);
+  border-radius: var(--radius-full);
+  color: var(--text-tertiary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.session-del svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.session-item:hover .session-del,
+.session-item.active .session-del {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.session-del:active {
+  background-color: var(--surface-2);
+  color: var(--danger-text);
+}
+
+/* 触摸端没有 hover，非当前项也保留入口，只是更淡 */
+@media (hover: none) {
+  .session-del {
+    opacity: 0.7;
+    pointer-events: auto;
+  }
+
+  .session-item:hover .session-del {
+    opacity: 0.7;
+  }
+}
+
+.drawer-foot {
+  flex: none;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border-hair);
+}
+
+.foot-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--tap);
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--fs-small);
+  line-height: 20px;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.foot-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.foot-btn:active {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+
+/* ----------------------------------------------------------------------------
+   10. 设置面板（底部升起的整屏 sheet，层级高于抽屉）
+   ---------------------------------------------------------------------------- */
+#settings {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  background-color: var(--bg);
+  visibility: hidden;
+  transform: translateY(100%);
+  transition: transform var(--dur-drawer) var(--ease), visibility var(--dur-drawer);
+  will-change: transform;
+}
+
+#settings.open {
+  visibility: visible;
+  transform: none;
+  transition: transform var(--dur-drawer) var(--ease);
+}
+
+.sheet-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 8px 6px 20px;
+  border-bottom: 1px solid var(--border-hair);
+  background-color: var(--bg);
+}
+
+.sheet-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.sheet-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 18px 16px 24px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 字段说明小字：单独一行，弱化对比度 */
+.field-hint {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: 0;
+  color: var(--text-tertiary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.field-input {
+  width: 100%;
+  height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--text-primary);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.field-input::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
+}
+
+.field-input:focus {
+  border-color: var(--accent);
+  background-color: var(--bg);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.field-textarea {
+  height: auto;
+  min-height: 92px;
+  padding: 11px 14px;
+  line-height: 24px;
+  resize: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 48px;
+}
+
+.row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 开关行内的说明文字：与标题竖排，弱化显示 */
+.row-label .field-hint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-tertiary);
+}
+
+/* ---- 开关 ---- */
+.switch {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 30px;
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background-color: var(--switch-track);
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color var(--dur) var(--ease);
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--switch-knob);
+  box-shadow: 0 1px 3px rgba(16, 19, 26, 0.24);
+  transition: transform var(--dur) var(--ease);
+}
+
+.switch:checked {
+  background-color: var(--accent);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+}
+
+.switch:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* ---- 下拉 ---- */
+.field-select {
+  flex: none;
+  max-width: 62%;
+  height: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.field-select:focus {
+  border-color: var(--accent);
+}
+
+/* ---- 按钮 ---- */
+.wide-btn {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 48px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background-color: var(--surface);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  text-align: center;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease), transform 0.12s var(--ease);
+}
+
+.wide-btn:active {
+  background-color: var(--surface-2);
+  transform: scale(0.99);
+}
+
+.wide-btn:disabled {
+  opacity: 0.45;
+  transform: none;
+}
+
+.wide-btn.primary {
+  border-color: transparent;
+  background-color: var(--accent);
+  color: #ffffff;
+}
+
+.wide-btn.primary:active {
+  background-color: var(--accent-press);
+}
+
+.wide-btn.danger {
+  border-color: var(--danger-border);
+  background-color: var(--danger-weak);
+  color: var(--danger-text);
+}
+
+.wide-btn.danger:active {
+  background-color: var(--danger-border);
+}
+
+/* 二次确认里的「确定」才用实底红，避免设置页里红色过重 */
+.confirm-actions .wide-btn.danger {
+  border-color: transparent;
+  background-color: var(--danger);
+  color: #ffffff;
+}
+
+.confirm-actions .wide-btn.danger:active {
+  opacity: 0.88;
+}
+
+.sheet-note {
+  padding: 0 2px;
+  font-size: var(--fs-meta);
+  line-height: 19px;
+  color: var(--text-tertiary);
+}
+
+/* 校验连接：.busy 用 ::after 转圈，文字保留占位不跳动 */
+#btn-verify {
+  position: relative;
+}
+
+#btn-verify.busy {
+  color: transparent;
+  pointer-events: none;
+}
+
+#btn-verify.busy svg {
+  opacity: 0;
+}
+
+#btn-verify.busy::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.78s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   11. Toast 与二次确认
+   ---------------------------------------------------------------------------- */
+#toast {
+  position: fixed;
+  top: calc(var(--safe-top) + 10px);
+  left: 50%;
+  z-index: 90;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
+  font-size: var(--fs-small);
+  line-height: 20px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  box-shadow: 0 4px 16px rgba(16, 19, 26, 0.18);
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  pointer-events: none;
+}
+
+#toast.toast-show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+#confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: var(--confirm-scrim);
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+
+#confirm[hidden] {
+  display: none !important;
+}
+
+.confirm-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 20px 20px 16px;
+  border-radius: 18px;
+  background-color: var(--bg-elevated);
+  box-shadow: var(--shadow-pop);
+  animation: card-in var(--dur) var(--ease);
+}
+
+.confirm-text {
+  margin-bottom: 18px;
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--text-primary);
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-actions .wide-btn {
+  flex: 1 1 0;
+  width: auto;
+  height: var(--tap);
+  font-size: 15px;
+}
+
+/* ----------------------------------------------------------------------------
+   12. 动效
+   ---------------------------------------------------------------------------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .typing-caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* 窄屏微调：320dp 下压缩左右留白，保证气泡不挤 */
+@media (max-width: 359px) {
+  #messages {
+    padding: 14px 12px 18px;
+  }
+
+  #composer {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .msg.user .msg-body,
+  .msg.user .msg-body .user-text {
+    max-width: 88%;
+  }
+
+  .welcome,
+  #welcome {
+    padding: 20px 20px 12vh;
+  }
+
+  .welcome-title {
+    font-size: 20px;
+    line-height: 28px;
+  }
+}
+
+/* ============================================================================
+   自查记录（360×740 / 412×915 / 320×700，Chromium 实测）
+   ----------------------------------------------------------------------------
+   [1] 横向溢出：html/body overflow:hidden；实测 documentElement.scrollWidth == clientWidth
+       （360/412/320 均为 0 溢出），#scroller 与 #messages 的 scrollWidth-clientWidth 均为 0；
+       .md-pre 内部滚动 110px / 58px、表格内有独立横向滚动，均被自身 overflow-x:auto 吸收；
+       用户气泡 width:fit-content + max-width:86% 且 overflow-wrap:anywhere，长 URL 不撑破。
+   [2] 触摸目标（Chromium 实测 getBoundingClientRect）：
+       360/412/320 三种宽度下 .icon-btn 44×44、.send-btn 44×44、#scroll-bottom 44×44、
+       .msg-tools button 44×44、.thinking-head 44 高、.foot-btn 44 高、
+       .wide-btn 48 高、.field-input 44 高、.session-item 56 高。
+       例外：.switch 本体 48×30，但它被 <label class="row">（48 高）包裹，点击面即整行。
+   [3] 布局跳动：#app 为 grid（auto / minmax(0,1fr) / auto），顶栏 56px 固定；
+       #composer 一行 = 71px，多行只增高 #input（max-height:40vh），其余行不变；
+       #scroll-bottom 与 #scroller 同格（grid-row 2 叠放、align-self:end），
+       只切 opacity/transform，既不占高度也不会因输入区变高而重叠；
+       .msg-tools 未展开时 height:0，不占用消息高度（避免不可见的 44px 空白）。
+   [4] 对比度（WCAG 2.1 相对亮度实算）：
+       深色 text-primary #E9EBEF/#151517 = 15.28；secondary #A9AEB6 = 8.18；
+       tertiary #8A8F97 = 5.61；placeholder #7F858D = 4.90；accent-text #8AB0FF = 8.45；
+       danger-text #F4776B = 6.68；代码块正文 14.41；深色气泡正文 11.68。
+       浅色 text-primary = 18.90；secondary #5A6069 = 6.34；tertiary #71767D = 4.58；
+       placeholder #868C94 = 3.39（占位符，按非文本 3:1 达标）；accent-text #2F58E8 = 5.70；
+       danger-text #C4291D = 5.70；主按钮白字/#3964FE = 4.74。
+       所有正文与次要文字 ≥4.5:1，占位符 ≥3:1。
+   [5] 输入框字号：全部 16px（#input / .field-input / .field-select），不会触发 WebView 自动放大。
+   [6] 文本选择：正文、列表、表格、时间戳均可选中；仅按钮/开关/折叠头/时间戳关闭选择。
+   [7] 资源：无 @import、无 url()、无网络字体与图片；图标全部为内联 svg + currentColor。
+   [8] 安全区：不使用 env()，改由原生注入变量（真机注入 --safe-top:40px 已实测生效）。
+       #topbar 用 box-sizing:content-box + height:56px + padding-top:var(--safe-top)，
+       使「可见栏」恒为 56px，标题与两侧 44px 按钮在可见栏内居中（实测偏移 0px）；
+       #drawer / #settings 的上下、#composer 的下、#toast 的上、
+       #scroll-bottom 的定位同样带对应变量。
+   [9] 层级：#composer 20 < #scroll-bottom 30 < #scrim 40 < #drawer 50 < #settings 60
+       < #toast 90 < #confirm 100，与契约一致（sheet 高于 drawer）。
+   [10] 动效：仅 transform/opacity；抽屉/设置 0.25s、淡入 0.18s；prefers-reduced-motion 下全部降为 ~0。
+   [11] 主题切换：#app 与 body 的底色有 0.22s 过渡，未使用 fixed 整页背景 hack。
+   [12] 与 app.js 真实 DOM 对齐：用户正文 .msg-body.user-text；助手正文 .msg-body > .answer > .md-*；
+        .thinking-toggle 展开/收起文案；#scrim 用 .show 类淡入淡出（而非依赖 hidden 的动画）；
+        .md-table-wrap 在 Java 侧是「每行一个」，故用逐行细线拼表而非整块圆角卡片。
+   [13] 公式：MdBridge 输出 .md-math[data-display]，app.js 用 KaTeX 原地排版；
+        行内公式 inline-block + 基线微调，块级公式独占一行居中，二者都限制 max-width:100%
+        并自带横向滚动，超宽公式不会撑破气泡。
+   [14] 表格窄屏：table-layout:auto + min-width:100%，首列 min-width:96px 且加粗，
+        非首列 nowrap，.md-table-wrap 自身 overflow-x:auto —— 360/320 下实测
+        documentElement 与 #scroller 溢出均为 0，表格在自己的容器里横向滚动。
+   [15] 消息节奏：.msg 基线间距 18px，.msg.user 额外 margin-bottom:6px，
+        用户气泡与其后助手正文之间实测 24px，不再贴脸。
+   [16] 思考区对比度：.thinking-title 用 text-primary（深色 15.3:1），
+        .thinking-toggle 用 text-secondary（深色 8.2:1），箭头同色，整条 44px 高可点。
+   ============================================================================ */
+
+/* ===== 服务端工具卡片（联网搜索 / 阅读链接） ===== */
+.tool-card {
+  margin: 0 0 10px;
+  border: 1px solid var(--border-l2, rgba(0,0,0,0.1));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-layer, transparent);
+}
+
+.tool-card-head {
+  position: relative;
+  padding: 11px 38px 11px 13px;
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.tool-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 20px;
+}
+
+.tool-card-sub {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-tertiary);
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tool-card-toggle {
+  position: absolute;
+  right: 13px;
+  top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tool-card-body {
+  display: none;
+  border-top: 1px solid var(--border-l1, rgba(0,0,0,0.06));
+}
+
+.tool-card.open .tool-card-body { display: block; }
+
+.tool-result {
+  display: block;
+  padding: 10px 13px;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid var(--border-l1, rgba(0,0,0,0.06));
+}
+
+.tool-result:last-child { border-bottom: none; }
+
+.tool-result-title {
+  font-size: 13px;
+  line-height: 19px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.tool-result-snippet {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tool-result-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* ===== 引用角标与来源列表 ===== */
+.citation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin: 0 2px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  text-decoration: none;
+  color: var(--text-secondary);
+  background: var(--markdown-citation, rgba(0,0,0,0.06));
+  vertical-align: 1px;
+}
+
+.source-list {
+  margin: 12px 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-l1, rgba(0,0,0,0.06));
+}
+
+.source-list-head {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.source-item {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.source-index {
+  flex: 0 0 auto;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--markdown-citation, rgba(0,0,0,0.06));
+}
+
+.source-title {
+  flex: 1 1 auto;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+/* ===== 输入区：附件按钮 / 麦克风 / 附件草稿 ===== */
+.attach-btn, .mic-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.attach-btn:active, .mic-btn:active {
+  background: var(--interactive-hover, rgba(0,0,0,0.06));
+}
+
+.mic-btn.recording {
+  color: #fff;
+  background: var(--danger, #ec1313);
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.62; }
+}
+
+.attach-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 4px 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.attach-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 190px;
+  padding: 7px 26px 7px 11px;
+  border-radius: 10px;
+  background: var(--surface-2, rgba(0,0,0,0.05));
+  position: relative;
+}
+
+.attach-chip.uploading { opacity: 0.62; }
+.attach-chip.error { background: rgba(236,19,19,0.1); }
+
+.attach-name {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attach-meta {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--text-tertiary);
+}
+
+.attach-del {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0;
+}
+
+/* ===== 消息内附件 ===== */
+.msg-files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.msg-file {
+  font-size: 12px;
+  line-height: 17px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: rgba(0,0,0,0.05);
+}
+
+body[data-theme="dark"] .msg-file { background: rgba(255,255,255,0.08); }
+
+.tool-btn.active { color: var(--accent, #3964fe); }
+
+
+/* ===== API Key 输入行：粘贴 + 显隐 + 遮罩 ===== */
+.key-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.key-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-code, Menlo, Consolas, monospace);
+  letter-spacing: 0.02em;
+}
+
+.key-btn {
+  flex: 0 0 auto;
+  min-width: 58px;
+  padding: 0 12px;
+  border: 1px solid var(--border-l2, rgba(0,0,0,0.1));
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.key-btn:active {
+  background: var(--interactive-hover, rgba(0,0,0,0.06));
+}
+
+.key-btn:disabled {
+  opacity: 0.5;
+}
+
+
+/* ===== 编辑消息提示条 ===== */
+.edit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 4px 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-2, rgba(0,0,0,0.05));
+}
+
+.edit-bar-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.edit-bar-cancel {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent, #3964fe);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.edit-bar-cancel:active {
+  background: var(--interactive-hover, rgba(0,0,0,0.06));
+}
+
+
+
+/* ===== 消息内图片缩略图 ===== */
+.msg-thumb {
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.msg-thumb img {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.msg-thumb:active { opacity: 0.82; }
+
+/* ===== 全屏看图 ===== */
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.image-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+
