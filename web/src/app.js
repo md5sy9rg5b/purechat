@@ -406,7 +406,6 @@
     }
     // 续写：保留这条回复，让模型接着往下写（不同于编辑，不改动已有文字）。
     var canContinue = message.role === 'assistant' && message.content
-      && index === lastIndex()
       && !(Array.isArray(message.tools) && message.tools.length);
     if (canContinue) {
       tools.appendChild(buildToolButton('续写', function () { startContinue(index); }));
@@ -1215,6 +1214,7 @@
   function cancelEdit() {
     editingIndex = -1;
     if (editOutputIndex >= 0) editOutputIndex = -1;
+    if (continueIndex >= 0) continueIndex = -1;
     el.input.value = '';
     autoGrow();
     el.editBar.hidden = true;
@@ -1302,46 +1302,68 @@
   var continueIndex = -1;
 
   /**
-   * 续写：保留已有回复，让模型从它末尾接着往下写。
+   * 进入续写：把这条回复放回输入框，可以修改，再以它为前缀让模型接着写。
    *
-   * <p>与「编辑」的区别：编辑会把你改过的文字当成新的回答开头，可以推翻重写；
-   * 续写不改动任何一个字，只是在这段回答后面追加内容，用来应对被截断
-   * （stop_reason 为 max_tokens）或想让它继续展开的情况。
-   * 协议上把已有回复作为末尾 assistant 消息原样发出即可，响应只包含新增部分。</p>
+   * <p>与「编辑」的区别：编辑只改本地文本、不请求接口；续写会拿你改过的这段内容
+   * 作为 assistant 前缀重新请求，让模型在它后面继续生成。</p>
    *
    * @param index 要续写的助手消息下标
    */
   function startContinue(index) {
     var session = currentSession();
     if (!session || streaming) return;
-    if (index !== session.messages.length - 1) {
-      toast('只能续写最后一条回复');
-      return;
-    }
     var message = session.messages[index];
-    if (!message || message.role !== 'assistant' || !message.content) return;
+    if (!message || message.role !== 'assistant') return;
     // 联网工具用过的回复不能续写，服务端会返回 400。
     if (Array.isArray(message.tools) && message.tools.length) {
       toast('这条回复用了联网工具，不能续写，请用重新生成');
       return;
     }
     continueIndex = index;
-    native.haptic();
-    runContinue(session, index);
+    el.input.value = message.content || '';
+    autoGrow();
+    setComposerState(false);
+    el.editBar.hidden = false;
+    el.editBarText.textContent = '正在续写这条回复，发送后从这里接着写';
+    el.input.focus();
+    try {
+      el.input.setSelectionRange(el.input.value.length, el.input.value.length);
+    } catch (e) { /* 忽略 */ }
+    el.scroller.scrollTop = el.scroller.scrollHeight;
   }
 
-  /** 执行续写：保留原消息，把新生成的内容追加到同一条回复后面。 */
-  function runContinue(session, index) {
-    var assistant = session.messages[index];
-    var prefix = assistant.content || '';
-    session.messages.splice(index + 1, session.messages.length - index - 1);
-    // 标记为流式，后续内容直接追加到这条消息上。
-    assistant.pending = true;
+  /** 提交续写：截断该条及其后内容，以编辑后的文本为前缀重新请求。 */
+  function submitContinue(text) {
+    var session = currentSession();
+    if (!session) return;
+    var index = continueIndex;
+    var original = session.messages[index];
+    session.messages.splice(index, session.messages.length - index);
+    continueIndex = -1;
+    el.editBar.hidden = true;
+    saveSessions();
     renderAll();
-    scrollToBottom(true);
+    sendContinue(session, text, original);
+  }
+
+  /**
+   * 以给定前缀请求续写，并把「前缀 + 续写」合并成一条新回复。
+   *
+   * @param session  当前会话
+   * @param prefix   用户编辑后的前缀文本
+   * @param original 被编辑的原消息（沿用其工具块与引用）
+   */
+  function sendContinue(session, prefix, original) {
+    var assistant = {
+      role: 'assistant', content: prefix, reasoning: '', ts: Date.now(), pending: true,
+    };
+    if (original && Array.isArray(original.tools)) assistant.tools = original.tools.slice();
+    if (original && Array.isArray(original.citations)) assistant.citations = original.citations.slice();
+    session.messages.push(assistant);
+    touch(session);
+    renderAll();
     var view = createLiveView(session.id, prefix);
-    if (view && view.node) view.node.setAttribute('data-continue', '1');
-    startStream(session, assistant, view, { continuePrefix: prefix, continueInto: index });
+    startStream(session, assistant, view, { continuePrefix: prefix });
   }
 
   function regenerate(index) {
@@ -1554,9 +1576,9 @@
 
   function setComposerState(isStreaming) {
     el.btnStop.hidden = !isStreaming;
-    // 编辑输出时即使清空也要能保存（等于删掉这条回复）。
-    var editingOutput = editOutputIndex >= 0;
-    el.btnSend.hidden = isStreaming || (!el.input.value.trim() && !editingOutput);
+    // 编辑输出或续写时即使清空也要能提交。
+    var editable = editOutputIndex >= 0 || continueIndex >= 0;
+    el.btnSend.hidden = isStreaming || (!el.input.value.trim() && !editable);
   }
 
   el.input.addEventListener('input', function () {
@@ -1579,6 +1601,14 @@
   function submit() {
     var text = el.input.value;
     if (streaming) return;
+    // 续写态：以输入框内容为前缀重新请求，允许清空（等于让模型重写这一条）。
+    if (continueIndex >= 0) {
+      el.input.value = '';
+      autoGrow();
+      setComposerState(false);
+      submitContinue(text);
+      return;
+    }
     // 编辑输出态：纯本地保存，不发请求。
     if (editOutputIndex >= 0) {
       el.input.value = '';
