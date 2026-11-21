@@ -18,6 +18,9 @@
   var STORE_SESSIONS = 'sessions';
   var STORE_CURRENT = 'current';
 
+  /** 单个请求可引用的文档上限（官方限制：每请求最多 20 个文档）。 */
+  var MAX_DOCS_PER_REQUEST = 20;
+
   var DEFAULT_SETTINGS = {
     apiKey: '',
     origin: 'https://api.deepseek.com',
@@ -1413,9 +1416,6 @@
   }
 
   // ---------------- 附件 ----------------
-
-  /** 单个请求可引用的文档上限（官方限制）。 */
-  var MAX_DOCS_PER_REQUEST = 20;
 
   function formatSize(bytes) {
     if (!bytes && bytes !== 0) return '';
