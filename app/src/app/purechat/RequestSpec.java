@@ -31,12 +31,28 @@ final class RequestSpec {
      */
     final boolean filesBeta;
 
-    private RequestSpec(String id, String origin, String apiKey, String body, boolean filesBeta) {
+    /**
+     * 是否走 beta 前缀续写接口。
+     *
+     * <p>为 true 时请求发往 {@code /beta/chat/completions}（Chat Completions 协议），
+     * 否则走 Anthropic 兼容的 {@code /anthropic/v1/messages}。由前端 payload 的
+     * "continueMode" 字段给出，缺省为 false。</p>
+     */
+    final boolean continueMode;
+
+    private RequestSpec(String id, String origin, String apiKey, String body, boolean filesBeta,
+            boolean continueMode) {
         this.id = id;
         this.origin = origin;
         this.apiKey = apiKey;
         this.body = body;
         this.filesBeta = filesBeta;
+        this.continueMode = continueMode;
+    }
+
+    /** 本次请求应使用的完整 URL。 */
+    String requestUrl() {
+        return continueMode ? betaCompletionsUrl() : messagesUrl();
     }
 
     /** 解析前端传入的参数；字段缺失或地址非法时抛出 IllegalArgumentException。 */
@@ -55,7 +71,20 @@ final class RequestSpec {
         if (body.isEmpty()) {
             throw new IllegalArgumentException("请求内容为空");
         }
-        return new RequestSpec(id, origin, apiKey, body, readFilesBeta(node));
+        return new RequestSpec(id, origin, apiKey, body, readFilesBeta(node),
+                readContinue(node));
+    }
+
+    /** 读取 "continueMode" 布尔字段：为 true 时走 beta 前缀续写接口。 */
+    private static boolean readContinue(Object node) {
+        Object value = Json.get(node, "continueMode");
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue();
+        }
+        if (value instanceof String) {
+            return "true".equalsIgnoreCase(((String) value).trim());
+        }
+        return false;
     }
 
     /** 读取 "filesBeta" 布尔字段；缺省或类型不符一律按 false 处理。 */
@@ -94,6 +123,19 @@ final class RequestSpec {
     /** Anthropic 兼容 Messages 接口地址。 */
     String messagesUrl() {
         return origin + "/anthropic/v1/messages";
+    }
+
+    /**
+     * 续写用的 Beta 接口地址（Chat Completions 协议）。
+     *
+     * <p>对话前缀续写（{@code prefix: true}）只在 beta 端点可用：正式端点会返回
+     * 400 {@code prefix is only available when using beta api}。
+     * 两者的请求体结构不同，由前端按 continuePrefix 决定走哪条路径。</p>
+     *
+     * @return beta Chat Completions 接口地址
+     */
+    String betaCompletionsUrl() {
+        return origin + "/beta/chat/completions";
     }
 
     /** 校验密钥用的根地址（与 Messages 接口同源）。 */

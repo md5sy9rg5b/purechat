@@ -989,22 +989,20 @@
     if (settings.autoTitle) body.title = { enabled: true };
     if (settings.safety) body.safety_check = { level: 'high' };
 
-    // 续写：末尾放一条 assistant 消息，服务端会接着它继续生成。
+    // 续写：按官方文档，最后一条 assistant 消息设置 prefix=true，
+    // 且请求必须发往 beta 端点，模型才会"以此为开头"补全而不是评价或重写。
     if (options && options.continuePrefix) {
       var last = messages.length ? messages[messages.length - 1] : null;
-      // 若最后一条已经是 assistant（说明被续写的是最新回复），替换而不是叠加。
       if (last && last.role === 'assistant') {
         messages[messages.length - 1] = { role: 'assistant', content: options.continuePrefix };
       } else {
         messages.push({ role: 'assistant', content: options.continuePrefix });
       }
+      var tail = messages[messages.length - 1];
+      tail.prefix = true;
     }
 
-    // 续写时附上任务说明：与用户自己写的系统提示词合并，用户的内容排在前面。
     var system = (settings.system || '').trim();
-    if (options && options.continueSystem) {
-      system = system ? (system + '\n\n' + options.continueSystem) : options.continueSystem;
-    }
     if (system) body.system = system;
     // 通知原生层：本次请求引用了 Files API 的文件，需要额外请求头。
     body.__filesBeta = anyFileRef(messages);
@@ -1061,6 +1059,7 @@
       origin: settings.origin,
       apiKey: settings.apiKey,
       filesBeta: filesBeta,
+      continueMode: !!(options && options.continuePrefix),
       body: JSON.stringify(body),
     };
 
@@ -1351,16 +1350,6 @@
   }
 
   /**
-   * 续写用的系统说明。
-   *
-   * <p>只把原文作为末尾 assistant 消息发出去时，模型常把它当成"待评价的句子"，
-   * 于是回出「这句话可以这样补完：」这类元话语，或干脆整段重写。
-   * 明确告诉它这是续写任务后，五种典型场景（半句/完整句/英文/代码/列表）都实测正常。</p>
-   */
-  var CONTINUE_SYSTEM = '用户给出一段已有的开头，你要自然地接着往下写。'
-    + '只输出续写的内容，不要重复开头，不要解释、评价或加标题。';
-
-  /**
    * 以给定前缀请求续写，并把「前缀 + 续写」合并成一条新回复。
    *
    * @param session  当前会话
@@ -1377,7 +1366,7 @@
     touch(session);
     renderAll();
     var view = createLiveView(session.id, prefix);
-    startStream(session, assistant, view, { continuePrefix: prefix, continueSystem: CONTINUE_SYSTEM });
+    startStream(session, assistant, view, { continuePrefix: prefix });
   }
 
   function regenerate(index) {

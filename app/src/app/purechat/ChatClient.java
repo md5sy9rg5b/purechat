@@ -120,7 +120,7 @@ final class ChatClient {
         HttpURLConnection connection = null;
         boolean finished = false;
         try {
-            URL url = new URL(spec.messagesUrl());
+            URL url = new URL(spec.requestUrl());
             connection = (HttpURLConnection) url.openConnection();
             prepare(connection);
             connection.setRequestMethod("POST");
@@ -158,6 +158,16 @@ final class ChatClient {
 
             listener.onEvent("{\"t\":\"open\"}");
             String contentType = connection.getContentType();
+            // beta 前缀续写走 Chat Completions 协议，事件结构与 Messages 不同，单独翻译。
+            if (spec.continueMode) {
+                boolean done = pumpChatCompletions(
+                        connection.getInputStream(), listener);
+                if (!done) {
+                    listener.onEvent("{\"t\":\"cut\"}");
+                }
+                listener.onEvent("{\"t\":\"end\"}");
+                return;
+            }
             InputStream in = connection.getInputStream();
             if (contentType != null && !contentType.contains("event-stream")) {
                 // 非 SSE 响应说明地址或协议不对，直接把内容作为错误提示。
@@ -226,6 +236,98 @@ final class ChatClient {
             closeQuietly(reader);
         }
         return stopped;
+    }
+
+    /**
+     * 解析 Chat Completions 协议的 SSE 流（beta 前缀续写用）。
+     *
+     * <p>每帧的 data 是一个完整的 chunk：{@code choices[0].delta.content} 是文本增量，
+     * {@code choices[0].finish_reason} 非空表示结束，流以 {@code data: [DONE]} 收尾。
+     * 这里把它翻译成与 Messages 路径一致的 {@code d} / {@code md} 事件，前端无需区分。</p>
+     *
+     * @param in       响应流
+     * @param listener 事件回调
+     * @return 是否正常结束
+     */
+    private boolean pumpChatCompletions(InputStream in, Listener listener) throws IOException {
+        SseDecoder decoder = new SseDecoder();
+        List<SseEvent> events = new ArrayList<SseEvent>();
+        Reader reader = new InputStreamReader(in, UTF8);
+        char[] buffer = new char[4096];
+        boolean finished = false;
+        try {
+            for (;;) {
+                int read = reader.read(buffer, 0, buffer.length);
+                if (read < 0) {
+                    break;
+                }
+                events.clear();
+                decoder.push(new String(buffer, 0, read), events);
+                for (int i = 0; i < events.size(); i++) {
+                    if (translateChatChunk(events.get(i).data, listener)) {
+                        finished = true;
+                        break;
+                    }
+                }
+                if (finished) {
+                    break;
+                }
+            }
+            if (!finished) {
+                events.clear();
+                decoder.end(events);
+                for (int i = 0; i < events.size(); i++) {
+                    if (translateChatChunk(events.get(i).data, listener)) {
+                        finished = true;
+                        break;
+                    }
+                }
+            }
+        } finally {
+            closeQuietly(reader);
+        }
+        return finished;
+    }
+
+    /** 翻译一个 Chat Completions chunk；返回是否为结束帧。 */
+    private boolean translateChatChunk(String data, Listener listener) {
+        if (data == null) {
+            return false;
+        }
+        String payload = data.trim();
+        if (payload.isEmpty()) {
+            return false;
+        }
+        if ("[DONE]".equals(payload)) {
+            return true;
+        }
+        Object node;
+        try {
+            node = Json.parse(payload);
+        } catch (JsonException e) {
+            return false;
+        }
+        Object error = Json.get(node, "error");
+        if (error != null) {
+            listener.onEvent(error(Json.str(error, "message", "请求失败")));
+            return false;
+        }
+        List<Object> choices = Json.arr(Json.get(node, "choices"));
+        if (choices != null && !choices.isEmpty()) {
+            Object first = choices.get(0);
+            Object delta = Json.get(first, "delta");
+            String content = Json.str(delta, "content", "");
+            if (content != null && !content.isEmpty()) {
+                listener.onEvent("{\"t\":\"d\",\"i\":0,\"dt\":\"text_delta\",\"x\":"
+                        + Json.stringify(content) + ",\"s\":\"\"}");
+            }
+            String finish = Json.str(first, "finish_reason", null);
+            if (finish != null && !finish.isEmpty()) {
+                listener.onEvent("{\"t\":\"md\",\"stop\":" + Json.stringify(finish)
+                        + ",\"in\":0,\"out\":0}");
+            }
+        }
+        return false;
     }
 
     /** 把一批 SSE 事件翻译成前端事件；返回是否遇到 message_stop。 */
