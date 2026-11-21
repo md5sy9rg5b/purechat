@@ -5,6 +5,7 @@ param(
     [string]$BuildTools = "34.0.0",
     [string]$Platform = "android-34",
     [string]$Sign = "sign",
+    [string]$Version = "",
     [switch]$SelfTestOnly
 )
 
@@ -27,6 +28,37 @@ Step "准备目录"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 New-Item -ItemType Directory -Force -Path (Join-Path $out "gen"), (Join-Path $out "classes"), (Join-Path $out "dex"), $assetsWeb | Out-Null
 
+# 版本号：优先用 -Version 参数，否则取 version.txt，最后回退到 git tag。
+# 写入构建目录的 Manifest 副本，源码 Manifest 不携带版本，避免两处不一致。
+$versionFile = Join-Path $root "version.txt"
+$appVersion = $Version
+if ([string]::IsNullOrWhiteSpace($appVersion)) {
+    if (Test-Path $versionFile) { $appVersion = (Get-Content $versionFile -Raw).Trim() }
+}
+if ([string]::IsNullOrWhiteSpace($appVersion)) {
+    $tag = ""
+    try { $tag = & git describe --tags --abbrev=0 2>$null } catch { }
+    if ($tag) { $appVersion = $tag.TrimStart("v") }
+}
+if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = "0.0.0" }
+# versionCode 用可比较的整数：1.0.4 => 1000004
+$verCode = 0
+foreach ($seg in $appVersion.Split(".")) {
+    $n = 0
+    if ([int]::TryParse($seg, [ref]$n)) { $verCode = $verCode * 1000 + $n }
+}
+if ($verCode -le 0) { $verCode = 1 }
+Write-Host ("版本: " + $appVersion + " (versionCode=" + $verCode + ")") -ForegroundColor DarkGray
+
+$manifestSrc = Join-Path $root "app\AndroidManifest.xml"
+$manifestBuild = Join-Path $out "AndroidManifest.xml"
+$manifestText = Get-Content $manifestSrc -Raw
+# 去掉源码里可能残留的版本属性，再统一注入本次构建的版本。
+$manifestText = $manifestText -replace '\s+android:versionCode="\d+"', ""
+$manifestText = $manifestText -replace '\s+android:versionName="[^"]*"', ""
+$verAttrs = ' android:versionCode="' + $verCode + '" android:versionName="' + $appVersion + '"'
+$manifestText = $manifestText -replace '(<manifest[^>]*?)\s*>', ('$1' + $verAttrs + ">")
+Set-Content -Path $manifestBuild -Value $manifestText -Encoding UTF8
 Step "同步前端资源"
 Copy-Item (Join-Path $webSrc "index.html") $assetsWeb -Force
 Copy-Item (Join-Path $webSrc "app.js") $assetsWeb -Force
@@ -78,7 +110,7 @@ Step "aapt2 compile"
 if ($LASTEXITCODE -ne 0) { Fail "aapt2 compile 失败" }
 
 Step "aapt2 link"
-$linkArgs = @("link", "-o", (Join-Path $out "base.apk"), "-I", $jar, "--manifest", (Join-Path $root "app\AndroidManifest.xml"), "-R", (Join-Path $out "res.zip"), "--java", (Join-Path $out "gen"), "--auto-add-overlay")
+$linkArgs = @("link", "-o", (Join-Path $out "base.apk"), "-I", $jar, "--manifest", $manifestBuild, "-R", (Join-Path $out "res.zip"), "--java", (Join-Path $out "gen"), "--auto-add-overlay")
 & (Join-Path $bt "aapt2.exe") @linkArgs
 if ($LASTEXITCODE -ne 0) { Fail "aapt2 link 失败" }
 
