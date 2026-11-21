@@ -1000,7 +1000,11 @@
       }
     }
 
+    // 续写时附上任务说明：与用户自己写的系统提示词合并，用户的内容排在前面。
     var system = (settings.system || '').trim();
+    if (options && options.continueSystem) {
+      system = system ? (system + '\n\n' + options.continueSystem) : options.continueSystem;
+    }
     if (system) body.system = system;
     // 通知原生层：本次请求引用了 Files API 的文件，需要额外请求头。
     body.__filesBeta = anyFileRef(messages);
@@ -1347,6 +1351,16 @@
   }
 
   /**
+   * 续写用的系统说明。
+   *
+   * <p>只把原文作为末尾 assistant 消息发出去时，模型常把它当成"待评价的句子"，
+   * 于是回出「这句话可以这样补完：」这类元话语，或干脆整段重写。
+   * 明确告诉它这是续写任务后，五种典型场景（半句/完整句/英文/代码/列表）都实测正常。</p>
+   */
+  var CONTINUE_SYSTEM = '用户给出一段已有的开头，你要自然地接着往下写。'
+    + '只输出续写的内容，不要重复开头，不要解释、评价或加标题。';
+
+  /**
    * 以给定前缀请求续写，并把「前缀 + 续写」合并成一条新回复。
    *
    * @param session  当前会话
@@ -1363,7 +1377,7 @@
     touch(session);
     renderAll();
     var view = createLiveView(session.id, prefix);
-    startStream(session, assistant, view, { continuePrefix: prefix });
+    startStream(session, assistant, view, { continuePrefix: prefix, continueSystem: CONTINUE_SYSTEM });
   }
 
   function regenerate(index) {
