@@ -955,16 +955,24 @@
       messages.push(m.role === 'user' ? toUserParam(m) : toAssistantParam(m));
     }
 
-    // 用户元信息必须紧挨在它所属的 user 消息之前，服务端只接受这个位置。
+    // 用户元信息：紧挨在所属 user 消息之前，且每一轮都带一条。
+    // 文档要求随历史一起回传之前各轮的这类消息，不回传虽不报错但会降低缓存命中。
     if (settings.reminder) {
       var reminder = buildReminder();
-      var firstUser = -1;
+      var withReminder = [];
+      // 按"轮"插入：each user 前一条，紧随其后的 assistant 之前不再插。
+      var pendingUser = true;
       for (var k = 0; k < messages.length; k++) {
-        if (messages[k].role === 'user') { firstUser = k; break; }
+        var item = messages[k];
+        if (item.role === 'user') {
+          withReminder.push({ role: 'latest_reminder', content: reminder });
+          pendingUser = false;
+        } else if (item.role === 'assistant') {
+          pendingUser = true;
+        }
+        withReminder.push(item);
       }
-      if (firstUser >= 0) {
-        messages.splice(firstUser, 0, { role: 'latest_reminder', content: reminder });
-      }
+      messages = withReminder;
     }
 
     var body = {
@@ -986,7 +994,10 @@
       if (settings.readUrl) tools.push({ type: 'deepseek_read_url', name: 'deepseek_read_url' });
       body.tools = tools;
     }
-    if (settings.autoTitle) body.title = { enabled: true };
+    // 文档建议只在会话的第一次请求上开启标题生成，拿到后不再开启，避免多余等待。
+    if (settings.autoTitle && !(session && session.titleAuto)) {
+      body.title = { enabled: true };
+    }
     if (settings.safety) body.safety_check = { level: 'high' };
 
     // 续写：按官方文档，最后一条 assistant 消息设置 prefix=true，
@@ -1016,6 +1027,11 @@
     var ready = draftFiles.filter(function (f) { return f.fileId && !f.error; });
     if (!content && !ready.length) return;
     if (draftFiles.some(function (f) { return f.uploading; })) { toast('附件还在上传，请稍候'); return; }
+    // 文档要求每个请求最多引用 20 个文档，超出会返回 400。
+    if (ready.filter(function (f) { return f.blockType !== 'image'; }).length > MAX_DOCS_PER_REQUEST) {
+      toast('每个请求最多引用 ' + MAX_DOCS_PER_REQUEST + ' 个文档');
+      return;
+    }
     if (!settings.apiKey) { openSettings(); toast('请先填写 API Key'); return; }
 
     var session = ensureSession();
@@ -1130,6 +1146,7 @@
           break;
         case 'md':
           if (event.stop) assistant.stopReason = event.stop;
+          if (event.explain) assistant.stopExplanation = event.explain;
           // 服务端生成的标题优先于本地取首句的占位标题。
           if (event.title && !session.titleAuto) {
             session.title = event.title;
@@ -1159,6 +1176,16 @@
     streaming = null;
     setComposerState(false);
     delete assistant.pending;
+    // 内容审核拒答：已流式下发的文字无法撤回，按文档要求清空后改为展示拒答提示。
+    if (assistant.stopReason === 'refusal') {
+      assistant.content = '';
+      assistant.reasoning = '';
+      assistant.citations = [];
+      assistant.refused = true;
+      assistant.error = assistant.stopExplanation
+        ? ('内容未通过安全审核：' + assistant.stopExplanation)
+        : '内容未通过安全审核，已被拒绝回答';
+    }
     if (!assistant.content && !assistant.error) {
       assistant.error = receivedStop ? '模型没有返回内容' : '回复未完成';
     }
@@ -1386,6 +1413,9 @@
   }
 
   // ---------------- 附件 ----------------
+
+  /** 单个请求可引用的文档上限（官方限制）。 */
+  var MAX_DOCS_PER_REQUEST = 20;
 
   function formatSize(bytes) {
     if (!bytes && bytes !== 0) return '';

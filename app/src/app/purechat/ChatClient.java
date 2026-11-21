@@ -377,6 +377,10 @@ final class ChatClient {
                     if (event.title != null && !event.title.isEmpty()) {
                         sb.append(",\"title\":").append(Json.stringify(event.title));
                     }
+                    // 拒答时把原因一并带给前端，便于展示具体是哪段内容未通过审核。
+                    if (event.stopExplanation != null && !event.stopExplanation.isEmpty()) {
+                        sb.append(",\"explain\":").append(Json.stringify(event.stopExplanation));
+                    }
                     sb.append('}');
                     listener.onEvent(sb.toString());
                     break;

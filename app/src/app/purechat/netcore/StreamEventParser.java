@@ -206,6 +206,14 @@ public final class StreamEventParser {
             ev.type = StreamEvent.MESSAGE_DELTA;
             Map<String, Object> delta = Json.obj(Json.get(root, "delta"));
             ev.stopReason = Json.str(delta, "stop_reason", Json.str(root, "stop_reason", null));
+            // 拒答时带 stop_details.explanation，前端据此展示具体原因。
+            Map<String, Object> details = Json.obj(Json.get(delta, "stop_details"));
+            if (details != null) {
+                String explanation = Json.str(details, "explanation", null);
+                if (explanation != null && !explanation.isEmpty()) {
+                    ev.stopExplanation = explanation;
+                }
+            }
             ev.title = Json.str(delta, "title", Json.str(root, "title", null));
             applyUsage(ev, Json.obj(Json.get(root, "usage")));
             return ev;

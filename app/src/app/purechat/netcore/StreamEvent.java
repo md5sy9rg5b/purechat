@@ -65,6 +65,14 @@ public final class StreamEvent {
     /** 标题：MESSAGE_DELTA 的 delta.title，没有时为 null。 */
     public String title;
 
+    /**
+     * 拒答说明：MESSAGE_DELTA 的 delta.stop_details.explanation。
+     *
+     * <p>仅当 stop_reason 为 refusal 时可能出现，内容是被拦截原因的可读描述
+     * （例如指出哪些图片未通过审核），没有时为 null。</p>
+     */
+    public String stopExplanation;
+
     /** 错误描述：ERROR 事件的可读信息。 */
     public String errorMessage;
 
