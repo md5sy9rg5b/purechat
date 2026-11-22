@@ -1252,6 +1252,15 @@
     if (!message || message.role !== 'user') return;
     editingIndex = index;
     el.input.value = message.content || '';
+    // 把原消息的附件放进草稿区：编辑时可以查看、删除或再追加，
+    // 否则用户看不到附件，也无法只保留文字或换一张图。
+    draftFiles = (message.files || []).map(function (f) {
+      return {
+        name: f.name, mime: f.mime, size: f.size, path: f.path,
+        blockType: f.blockType, fileId: f.fileId, uploading: false, error: null,
+      };
+    });
+    renderDraftFiles();
     autoGrow();
     setComposerState(false);
     renderEditBar(message);
@@ -1274,10 +1283,17 @@
 
   /** 退出编辑状态，清空输入框。 */
   function cancelEdit() {
+    var wasEditingUser = editingIndex >= 0;
     editingIndex = -1;
     if (editOutputIndex >= 0) editOutputIndex = -1;
     if (continueIndex >= 0) continueIndex = -1;
     el.input.value = '';
+    // 编辑用户消息时带入的附件属于那条消息，取消编辑要一并清掉，
+    // 避免它们变成新消息的附件。
+    if (wasEditingUser && draftFiles.length) {
+      draftFiles = [];
+      renderDraftFiles();
+    }
     autoGrow();
     el.editBar.hidden = true;
     setComposerState(!!streaming);
@@ -1297,14 +1313,7 @@
     editingIndex = -1;
     el.editBar.hidden = true;
     renderAll();
-    // 附件随原消息保留，重新发送。
-    draftFiles = files.map(function (f) {
-      return {
-        name: f.name, mime: f.mime, size: f.size, path: f.path,
-        blockType: f.blockType, fileId: f.fileId, uploading: false, error: null,
-      };
-    });
-    renderDraftFiles();
+    // 附件已在进入编辑时放进草稿区，用户可能已调整过，这里按当前草稿发送。
     send(text);
   }
 
