@@ -919,22 +919,37 @@
    * 因此这里按原始顺序重建 server_tool_use 与工具结果块，并保留 signature。</p>
    */
   function toAssistantParam(m) {
-    var blocks = [];
     var tools = Array.isArray(m.tools) ? m.tools : [];
-    if (!tools.length) {
+    var hasThinking = !!(m.reasoning && m.signature);
+    if (!tools.length && !hasThinking) {
       return { role: 'assistant', content: m.content || '' };
+    }
+    var blocks = [];
+    // 思考块必须保留：文档说明携带 tools 时历史思考要回传，缺失时服务端
+    // 虽会尝试按工具调用 ID 恢复，但恢复不了一律返回 400，不能依赖自动恢复。
+    // 一次回复可能有多个思考块，按原始顺序组装（用 blk 记录来源以便排序）。
+    var seq = [];
+    var thinkingList = Array.isArray(m.thinkingBlocks) ? m.thinkingBlocks
+      : (hasThinking ? [{ i: -1, thinking: m.reasoning, signature: m.signature }] : []);
+    for (var t = 0; t < thinkingList.length; t++) {
+      var th = thinkingList[t];
+      if (!th || !th.signature) continue;
+      seq.push({ pos: th.i * 2, block: { type: 'thinking', thinking: th.thinking || '', signature: th.signature } });
     }
     for (var i = 0; i < tools.length; i++) {
       var block = tools[i];
       if (!block || !block.type) continue;
+      var pos = (typeof block.__i === 'number' ? block.__i : 1000 + i) * 2 + 1;
       if (block.type === 'server_tool_use') {
-        var call = { type: 'server_tool_use', id: block.id, name: block.name, input: block.input, kind: block.kind };
-        blocks.push(call);
+        seq.push({ pos: pos, block: { type: 'server_tool_use', id: block.id, name: block.name,
+          input: block.input, kind: block.kind } });
       } else if (block.type === 'web_search_tool_result' || block.type === 'web_fetch_tool_result') {
-        blocks.push(block);
+        seq.push({ pos: pos, block: block });
       }
     }
-    // 正文始终放在最后，与服务端下发的块顺序一致。
+    seq.sort(function (a, b) { return a.pos - b.pos; });
+    for (var s = 0; s < seq.length; s++) blocks.push(seq[s].block);
+    // 正文放在最后，与服务端下发的块顺序一致。
     if (m.content) blocks.push({ type: 'text', text: m.content });
     if (!blocks.length) return { role: 'assistant', content: m.content || '' };
     return { role: 'assistant', content: blocks };
@@ -1131,7 +1146,21 @@
             assistant.reasoning = (assistant.reasoning || '') + (event.x || '');
           } else if (event.dt === 'signature_delta') {
             block.signature += event.s || '';
-            assistant.signature = block.signature;
+            // 一次回复可能有多个思考块（每个都带自己的签名），
+            // 回传时必须按原顺序完整给出，否则服务端恢复不了上下文。
+            block.__i = event.i;
+            assistant.thinkingBlocks = assistant.thinkingBlocks || [];
+            var existing = null;
+            for (var bi = 0; bi < assistant.thinkingBlocks.length; bi++) {
+              if (assistant.thinkingBlocks[bi].i === event.i) { existing = assistant.thinkingBlocks[bi]; break; }
+            }
+            if (existing) {
+              existing.signature = block.signature;
+            } else {
+              assistant.thinkingBlocks.push({
+                i: event.i, thinking: block.text || '', signature: block.signature,
+              });
+            }
           } else if (event.dt === 'citations_delta') {
             var c;
             try { c = JSON.parse(event.x); } catch (e) { c = null; }
