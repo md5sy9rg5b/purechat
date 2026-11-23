@@ -1658,13 +1658,60 @@
   });
 
   el.input.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-      event.preventDefault();
-      submit();
-    }
+    if (event.key !== 'Enter' || event.isComposing) return;
+    // 手机上没有 Shift 可用，因此默认 Enter 就是换行；用 Ctrl/⌘+Enter 或发送按钮提交。
+    // 物理键盘上 Shift+Enter 也换行，与桌面习惯一致。
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    submit();
   });
 
-  el.btnSend.addEventListener('click', submit);
+  // 长按发送按钮插入换行：给触屏用户一个明确、不占额外版面的换行入口。
+  var sendHoldTimer = null;
+  var sendLongPressed = false;
+
+  function beginSendHold(event) {
+    sendLongPressed = false;
+    if (sendHoldTimer) window.clearTimeout(sendHoldTimer);
+    sendHoldTimer = window.setTimeout(function () {
+      sendLongPressed = true;
+      insertNewline();
+      native.haptic();
+      event.preventDefault();
+    }, 450);
+  }
+
+  function endSendHold() {
+    if (sendHoldTimer) { window.clearTimeout(sendHoldTimer); sendHoldTimer = null; }
+  }
+
+  el.btnSend.addEventListener('pointerdown', beginSendHold);
+  el.btnSend.addEventListener('pointerup', endSendHold);
+  el.btnSend.addEventListener('pointercancel', endSendHold);
+  el.btnSend.addEventListener('pointerleave', endSendHold);
+
+  /** 在光标处插入一个换行。 */
+  function insertNewline() {
+    var start = el.input.selectionStart;
+    var end = el.input.selectionEnd;
+    var value = el.input.value;
+    if (typeof start !== 'number') {
+      el.input.value = value + '\n';
+    } else {
+      el.input.value = value.slice(0, start) + '\n' + value.slice(end);
+      var caret = start + 1;
+      try { el.input.setSelectionRange(caret, caret); } catch (e) { /* 忽略 */ }
+    }
+    autoGrow();
+    setComposerState(false);
+    el.input.focus();
+  }
+
+  el.btnSend.addEventListener('click', function (event) {
+    // 长按已插入换行时，松手不应再触发发送。
+    if (sendLongPressed) { sendLongPressed = false; event.preventDefault(); return; }
+    submit();
+  });
   el.btnStop.addEventListener('click', function () { native.haptic(); stopStream(); });
   el.btnAttach.addEventListener('click', function () { native.haptic(); pickAttachments(); });
   el.btnMic.addEventListener('click', function () { toggleVoice(); });

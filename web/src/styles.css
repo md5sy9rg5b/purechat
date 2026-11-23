@@ -1246,7 +1246,9 @@ body[data-theme="dark"] .scroll-bottom {
   min-height: 44px;
   max-height: 40vh;
   margin: 0;
-  padding: 10px 0;
+  /* 底部留出按钮占据的高度：输入框与按钮底部对齐，
+     多行文字若不预留这块空间，末行会滑到发送按钮下方被遮住。 */
+  padding: 10px 0 44px;
   overflow-y: auto;
   border: 0;
   border-radius: 0;
